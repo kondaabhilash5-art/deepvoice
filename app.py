@@ -1,20 +1,18 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
-import pandas as pd
-import numpy as np
-import librosa
-import joblib
-
 import os
 import tempfile
 
+import numpy as np
+import pandas as pd
+import librosa
+import joblib
+
 
 # ============================================================
-# PATHS
+# CONFIGURATION
 # ============================================================
-
-# app.py is now in the ROOT of the GitHub repository
 
 BASE_DIR = os.path.dirname(
     os.path.abspath(__file__)
@@ -23,20 +21,30 @@ BASE_DIR = os.path.dirname(
 MODEL_PATH = os.path.join(
     BASE_DIR,
     "model",
-    "deepvoice_model.pkl"
+    "deepvoice_model_v2.pkl"
 )
+
+# If your actual file is named deepvoice_model.pkl,
+# change the line above to:
+#
+# MODEL_PATH = os.path.join(
+#     BASE_DIR,
+#     "model",
+#     "deepvoice_model.pkl"
+# )
+
 
 FRONTEND_DIR = os.path.join(
     BASE_DIR,
     "frontend"
 )
 
-
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
+# Your existing decision rule
 AI_THRESHOLD = 0.85
+
+# Memory-friendly audio settings
+TARGET_SAMPLE_RATE = 16000
+MAX_AUDIO_SECONDS = 30
 
 
 # ============================================================
@@ -69,6 +77,12 @@ print(MODEL_PATH)
 print("Frontend path:")
 print(FRONTEND_DIR)
 
+print("================================")
+
+
+model = None
+FEATURES = []
+
 
 try:
 
@@ -76,19 +90,24 @@ try:
         MODEL_PATH
     )
 
+    # Expected structure:
+    # {
+    #     "model": trained_model,
+    #     "features": [...]
+    # }
+
     model = model_data["model"]
 
     FEATURES = model_data["features"]
 
-    print()
     print("Model loaded successfully")
+
     print(
         f"Features: {len(FEATURES)}"
     )
 
 except Exception as e:
 
-    print()
     print("ERROR loading model:")
     print(str(e))
 
@@ -97,7 +116,7 @@ except Exception as e:
 
 
 # ============================================================
-# FRONTEND
+# HOME PAGE
 # ============================================================
 
 @app.route("/")
@@ -110,7 +129,7 @@ def home():
 
 
 # ============================================================
-# FRONTEND STATIC FILES
+# FRONTEND FILES
 # ============================================================
 
 @app.route("/<path:filename>")
@@ -157,45 +176,85 @@ def health():
             len(FEATURES),
 
         "threshold":
-            AI_THRESHOLD * 100
+            AI_THRESHOLD * 100,
+
+        "sample_rate":
+            TARGET_SAMPLE_RATE,
+
+        "max_audio_seconds":
+            MAX_AUDIO_SECONDS
 
     })
 
 
 # ============================================================
-# AUDIO FEATURE EXTRACTION
+# FEATURE EXTRACTION
 # ============================================================
 
 def extract_features(audio_path):
 
-    # Load audio
+    print("Loading audio...")
+
+    # --------------------------------------------------------
+    # MEMORY OPTIMIZATION
+    # --------------------------------------------------------
+    #
+    # 16 kHz is enough for speech analysis.
+    #
+    # duration=30 prevents very long WhatsApp recordings
+    # from consuming excessive RAM.
+    #
+
     y, sr = librosa.load(
         audio_path,
-        sr=None,
-        mono=True
+        sr=TARGET_SAMPLE_RATE,
+        mono=True,
+        duration=MAX_AUDIO_SECONDS
     )
 
-    if len(y) == 0:
+    if y is None or len(y) == 0:
 
         raise ValueError(
-            "Audio file is empty"
+            "Audio file is empty or could not be decoded."
         )
 
 
-    # Chroma
+    print(
+        f"Audio loaded: {len(y)} samples"
+    )
+
+    print(
+        f"Sample rate: {sr}"
+    )
+
+    print(
+        f"Duration: {len(y) / sr:.2f} seconds"
+    )
+
+
+    # ========================================================
+    # CHROMA
+    # ========================================================
+
     chroma = librosa.feature.chroma_stft(
         y=y,
         sr=sr
     )
 
 
+    # ========================================================
     # RMS
+    # ========================================================
+
     rms = librosa.feature.rms(
         y=y
     )
 
 
-    # Spectral centroid
+    # ========================================================
+    # SPECTRAL CENTROID
+    # ========================================================
+
     spectral_centroid = (
         librosa.feature.spectral_centroid(
             y=y,
@@ -204,7 +263,10 @@ def extract_features(audio_path):
     )
 
 
-    # Spectral bandwidth
+    # ========================================================
+    # SPECTRAL BANDWIDTH
+    # ========================================================
+
     spectral_bandwidth = (
         librosa.feature.spectral_bandwidth(
             y=y,
@@ -213,7 +275,10 @@ def extract_features(audio_path):
     )
 
 
-    # Spectral rolloff
+    # ========================================================
+    # SPECTRAL ROLLOFF
+    # ========================================================
+
     rolloff = (
         librosa.feature.spectral_rolloff(
             y=y,
@@ -222,7 +287,10 @@ def extract_features(audio_path):
     )
 
 
-    # Zero crossing rate
+    # ========================================================
+    # ZERO CROSSING RATE
+    # ========================================================
+
     zero_crossing_rate = (
         librosa.feature.zero_crossing_rate(
             y
@@ -230,7 +298,10 @@ def extract_features(audio_path):
     )
 
 
+    # ========================================================
     # MFCC
+    # ========================================================
+
     mfcc = librosa.feature.mfcc(
         y=y,
         sr=sr,
@@ -238,14 +309,21 @@ def extract_features(audio_path):
     )
 
 
-    # Create features
+    # ========================================================
+    # CREATE FEATURE DICTIONARY
+    # ========================================================
+
     features = {
 
         "chroma_stft":
-            float(np.mean(chroma)),
+            float(
+                np.mean(chroma)
+            ),
 
         "rms":
-            float(np.mean(rms)),
+            float(
+                np.mean(rms)
+            ),
 
         "spectral_centroid":
             float(
@@ -263,7 +341,9 @@ def extract_features(audio_path):
 
         "rolloff":
             float(
-                np.mean(rolloff)
+                np.mean(
+                    rolloff
+                )
             ),
 
         "zero_crossing_rate":
@@ -272,10 +352,14 @@ def extract_features(audio_path):
                     zero_crossing_rate
                 )
             )
+
     }
 
 
+    # ========================================================
     # MFCC 1-20
+    # ========================================================
+
     for i in range(20):
 
         features[
@@ -291,7 +375,7 @@ def extract_features(audio_path):
 
 
 # ============================================================
-# PREDICTION
+# PREDICT
 # ============================================================
 
 @app.route(
@@ -304,8 +388,14 @@ def predict():
 
     try:
 
+        print()
+        print("================================")
+        print("NEW AUDIO REQUEST")
+        print("================================")
+
+
         # ----------------------------------------------------
-        # Check model
+        # CHECK MODEL
         # ----------------------------------------------------
 
         if model is None:
@@ -315,13 +405,13 @@ def predict():
                 "success": False,
 
                 "error":
-                    "Model is not loaded"
+                    "Model is not loaded on the server."
 
             }), 500
 
 
         # ----------------------------------------------------
-        # Check audio
+        # CHECK AUDIO
         # ----------------------------------------------------
 
         if "audio" not in request.files:
@@ -331,7 +421,7 @@ def predict():
                 "success": False,
 
                 "error":
-                    "No audio file provided"
+                    "No audio file provided."
 
             }), 400
 
@@ -348,18 +438,25 @@ def predict():
                 "success": False,
 
                 "error":
-                    "No file selected"
+                    "No audio file selected."
 
             }), 400
 
 
+        print(
+            "File:",
+            audio.filename
+        )
+
+
         # ----------------------------------------------------
-        # Get extension
+        # GET FILE EXTENSION
         # ----------------------------------------------------
 
         extension = os.path.splitext(
             audio.filename
         )[1].lower()
+
 
         if not extension:
 
@@ -367,7 +464,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # Temporary file
+        # SAVE TEMPORARY AUDIO
         # ----------------------------------------------------
 
         with tempfile.NamedTemporaryFile(
@@ -382,17 +479,13 @@ def predict():
             )
 
 
-        print()
-        print("--------------------------------")
         print(
-            "Analyzing:",
-            audio.filename
+            "Temporary file created."
         )
-        print("--------------------------------")
 
 
         # ----------------------------------------------------
-        # Extract features
+        # EXTRACT FEATURES
         # ----------------------------------------------------
 
         features = extract_features(
@@ -400,8 +493,13 @@ def predict():
         )
 
 
+        print(
+            "Features extracted."
+        )
+
+
         # ----------------------------------------------------
-        # DataFrame
+        # CREATE DATAFRAME
         # ----------------------------------------------------
 
         input_data = pd.DataFrame(
@@ -410,7 +508,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # Check model features
+        # CHECK FEATURES
         # ----------------------------------------------------
 
         missing_features = [
@@ -429,20 +527,24 @@ def predict():
 
             raise ValueError(
                 "Missing model features: "
-                + ", ".join(
+                +
+                ", ".join(
                     missing_features
                 )
             )
 
 
-        # Correct feature order
+        # ----------------------------------------------------
+        # CORRECT FEATURE ORDER
+        # ----------------------------------------------------
+
         input_data = input_data[
             FEATURES
         ]
 
 
         # ----------------------------------------------------
-        # Prediction probabilities
+        # MODEL PREDICTION
         # ----------------------------------------------------
 
         probabilities = (
@@ -452,8 +554,9 @@ def predict():
         )
 
 
-        # Class 0 = REAL
-        # Class 1 = FAKE
+        # ----------------------------------------------------
+        # PROBABILITIES
+        # ----------------------------------------------------
 
         real_probability = float(
             probabilities[0]
@@ -465,8 +568,19 @@ def predict():
 
 
         # ----------------------------------------------------
-        # Final decision
+        # DECISION
         # ----------------------------------------------------
+        #
+        # IMPORTANT:
+        #
+        # This remains your existing rule:
+        #
+        # AI >= 85%  -> FAKE
+        # AI < 85%   -> REAL
+        #
+        # The frontend may display the larger percentage,
+        # but this backend decision does NOT change.
+        #
 
         if (
             fake_probability
@@ -497,7 +611,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # Confidence
+        # CONFIDENCE
         # ----------------------------------------------------
 
         confidence = max(
@@ -523,8 +637,13 @@ def predict():
 
 
         # ----------------------------------------------------
-        # Terminal
+        # LOG RESULT
         # ----------------------------------------------------
+
+        print()
+        print("--------------------------------")
+        print("RESULT")
+        print("--------------------------------")
 
         print(
             "Prediction:",
@@ -532,18 +651,30 @@ def predict():
         )
 
         print(
-            "Real:",
+            "Real probability:",
             f"{real_percentage}%"
         )
 
         print(
-            "AI:",
+            "AI probability:",
             f"{fake_percentage}%"
         )
 
+        print(
+            "Displayed confidence:",
+            f"{confidence_percentage}%"
+        )
+
+        print(
+            "AI threshold:",
+            "85%"
+        )
+
+        print("--------------------------------")
+
 
         # ----------------------------------------------------
-        # Response
+        # RETURN JSON
         # ----------------------------------------------------
 
         return jsonify({
@@ -579,9 +710,18 @@ def predict():
 
         print()
         print("================================")
-        print("ERROR")
+        print("PREDICTION ERROR")
         print("================================")
-        print(str(e))
+
+        print(
+            type(e).__name__
+        )
+
+        print(
+            str(e)
+        )
+
+        print("================================")
 
 
         return jsonify({
@@ -597,6 +737,10 @@ def predict():
 
     finally:
 
+        # ----------------------------------------------------
+        # DELETE TEMP FILE
+        # ----------------------------------------------------
+
         if (
             audio_path
             and
@@ -611,13 +755,16 @@ def predict():
                     audio_path
                 )
 
-            except Exception:
+            except Exception as cleanup_error:
 
-                pass
+                print(
+                    "Temporary file cleanup failed:",
+                    cleanup_error
+                )
 
 
 # ============================================================
-# START SERVER
+# RUN SERVER
 # ============================================================
 
 if __name__ == "__main__":
@@ -629,20 +776,30 @@ if __name__ == "__main__":
         )
     )
 
+
     print()
     print("================================")
     print("Starting DeepVoice Guard")
     print("================================")
 
     print(
-        f"Website port: {port}"
+        f"Port: {port}"
     )
 
     print(
         "AI threshold: 85%"
     )
 
-    print()
+    print(
+        f"Sample rate: {TARGET_SAMPLE_RATE}"
+    )
+
+    print(
+        f"Maximum audio: {MAX_AUDIO_SECONDS} seconds"
+    )
+
+    print("================================")
+
 
     app.run(
         host="0.0.0.0",
