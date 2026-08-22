@@ -18,27 +18,44 @@ BASE_DIR = os.path.dirname(
     os.path.abspath(__file__)
 )
 
+# V2 model
 MODEL_PATH = os.path.join(
     BASE_DIR,
     "model",
     "deepvoice_model_v2.pkl"
 )
 
+# IMPORTANT:
+# Your structure is:
+#
+# deepvoice/
+# ├── app.py
+# ├── requirements.txt
+# ├── model/
+# │   └── deepvoice_model_v2.pkl
+# └── frontend/
+#     ├── index.html
+#     ├── script.js
+#     └── style.css
+#
+# Therefore frontend is inside BASE_DIR.
+
 FRONTEND_DIR = os.path.join(
-    os.path.dirname(BASE_DIR),
+    BASE_DIR,
     "frontend"
 )
 
-
-# ============================================================
-# FLASK APPLICATION
-# ============================================================
-
-app = Flask(
-    __name__,
-    static_folder=FRONTEND_DIR,
-    static_url_path=""
+INDEX_FILE = os.path.join(
+    FRONTEND_DIR,
+    "index.html"
 )
+
+
+# ============================================================
+# FLASK APP
+# ============================================================
+
+app = Flask(__name__)
 
 CORS(app)
 
@@ -56,24 +73,51 @@ AI_THRESHOLD = 0.85
 
 
 # ============================================================
-# LOAD V2 MODEL
+# STARTUP INFORMATION
 # ============================================================
 
-print("================================")
+print("========================================")
 print("DeepVoice Guard Backend")
-print("================================")
+print("========================================")
 
-print(
-    "Model path:",
-    MODEL_PATH
-)
+print("BASE DIR:")
+print(BASE_DIR)
 
-print(
-    "Frontend path:",
-    FRONTEND_DIR
-)
+print()
 
-print("================================")
+print("MODEL PATH:")
+print(MODEL_PATH)
+
+print()
+
+print("FRONTEND PATH:")
+print(FRONTEND_DIR)
+
+print()
+
+print("INDEX FILE:")
+print(INDEX_FILE)
+
+print()
+
+print("Model exists:")
+print(os.path.exists(MODEL_PATH))
+
+print("Frontend exists:")
+print(os.path.isdir(FRONTEND_DIR))
+
+print("index.html exists:")
+print(os.path.isfile(INDEX_FILE))
+
+print("========================================")
+
+
+# ============================================================
+# LOAD MODEL V2
+# ============================================================
+
+model = None
+FEATURES = []
 
 
 try:
@@ -86,27 +130,158 @@ try:
 
     FEATURES = model_data["features"]
 
-    print(
-        "Model V2 loaded successfully"
-    )
+    print("Model V2 loaded successfully")
 
     print(
-        f"Features: {len(FEATURES)}"
+        "Features:",
+        len(FEATURES)
     )
 
 except Exception as e:
 
+    print("========================================")
+    print("MODEL LOAD ERROR")
+    print("========================================")
+
     print(
-        "ERROR loading V2 model:"
+        type(e).__name__
     )
 
     print(
         str(e)
     )
 
-    model = None
+    print("========================================")
 
-    FEATURES = []
+
+# ============================================================
+# HOME PAGE
+# ============================================================
+
+@app.route("/", methods=["GET"])
+def home():
+
+    print("HOME REQUEST")
+
+    print(
+        "Looking for:",
+        INDEX_FILE
+    )
+
+    if not os.path.isfile(
+        INDEX_FILE
+    ):
+
+        return jsonify({
+
+            "success": False,
+
+            "error":
+                "frontend/index.html not found",
+
+            "expected_path":
+                INDEX_FILE,
+
+            "frontend_directory":
+                FRONTEND_DIR
+
+        }), 500
+
+
+    return send_from_directory(
+        FRONTEND_DIR,
+        "index.html"
+    )
+
+
+# ============================================================
+# FRONTEND FILES
+# ============================================================
+
+@app.route(
+    "/<path:filename>",
+    methods=["GET"]
+)
+def frontend_file(filename):
+
+    requested_file = os.path.join(
+        FRONTEND_DIR,
+        filename
+    )
+
+
+    if os.path.isfile(
+        requested_file
+    ):
+
+        return send_from_directory(
+            FRONTEND_DIR,
+            filename
+        )
+
+
+    return jsonify({
+
+        "success": False,
+
+        "error":
+            "Frontend file not found",
+
+        "file":
+            filename
+
+    }), 404
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.route(
+    "/health",
+    methods=["GET"]
+)
+def health():
+
+    return jsonify({
+
+        "success":
+            True,
+
+        "status":
+            "online",
+
+        "service":
+            "DeepVoice Guard",
+
+        "model":
+            "V2",
+
+        "model_loaded":
+            model is not None,
+
+        "features":
+            len(FEATURES),
+
+        "model_exists":
+            os.path.isfile(
+                MODEL_PATH
+            ),
+
+        "frontend_exists":
+            os.path.isdir(
+                FRONTEND_DIR
+            ),
+
+        "index_exists":
+            os.path.isfile(
+                INDEX_FILE
+            ),
+
+        "threshold":
+            AI_THRESHOLD * 100
+
+    })
 
 
 # ============================================================
@@ -115,27 +290,13 @@ except Exception as e:
 
 def extract_features(audio_path):
 
-    """
-    Extract the exact same 26 features
-    used by the V2 testing script.
-    """
+    print("Loading audio...")
 
-    # --------------------------------------------------------
-    # IMPORTANT
-    # --------------------------------------------------------
+    # IMPORTANT:
+    # This matches your V2 training/testing code.
     #
-    # This is intentionally sr=None.
-    #
-    # Your V2 test_model_v2.py uses:
-    #
-    # librosa.load(
-    #     audio_path,
-    #     sr=None,
-    #     mono=True
-    # )
-    #
-    # We MUST keep the same preprocessing.
-    #
+    # sr=None
+    # mono=True
 
     y, sr = librosa.load(
         audio_path,
@@ -152,13 +313,17 @@ def extract_features(audio_path):
 
 
     print(
-        "Audio sample rate:",
+        "Sample rate:",
         sr
     )
 
     print(
-        "Audio duration:",
-        f"{len(y) / sr:.2f} seconds"
+        "Duration:",
+        round(
+            len(y) / sr,
+            2
+        ),
+        "seconds"
     )
 
 
@@ -302,95 +467,7 @@ def extract_features(audio_path):
 
 
 # ============================================================
-# HOME PAGE
-# ============================================================
-
-@app.route(
-    "/",
-    methods=["GET"]
-)
-def home():
-
-    return send_from_directory(
-        FRONTEND_DIR,
-        "index.html"
-    )
-
-
-# ============================================================
-# FRONTEND FILES
-# ============================================================
-
-@app.route(
-    "/<path:filename>",
-    methods=["GET"]
-)
-def frontend_files(filename):
-
-    file_path = os.path.join(
-        FRONTEND_DIR,
-        filename
-    )
-
-
-    if os.path.isfile(
-        file_path
-    ):
-
-        return send_from_directory(
-            FRONTEND_DIR,
-            filename
-        )
-
-
-    return jsonify({
-
-        "success": False,
-
-        "error":
-            "File not found"
-
-    }), 404
-
-
-# ============================================================
-# HEALTH CHECK
-# ============================================================
-
-@app.route(
-    "/health",
-    methods=["GET"]
-)
-def health():
-
-    return jsonify({
-
-        "success":
-            True,
-
-        "status":
-            "online",
-
-        "service":
-            "DeepVoice Guard",
-
-        "model":
-            "V2",
-
-        "model_loaded":
-            model is not None,
-
-        "features":
-            len(FEATURES),
-
-        "threshold":
-            AI_THRESHOLD * 100
-
-    })
-
-
-# ============================================================
-# PREDICTION API
+# PREDICT
 # ============================================================
 
 @app.route(
@@ -405,9 +482,9 @@ def predict():
     try:
 
         print()
-        print("================================")
+        print("========================================")
         print("NEW AUDIO REQUEST")
-        print("================================")
+        print("========================================")
 
 
         # ----------------------------------------------------
@@ -418,7 +495,8 @@ def predict():
 
             return jsonify({
 
-                "success": False,
+                "success":
+                    False,
 
                 "error":
                     "V2 model is not loaded."
@@ -434,7 +512,8 @@ def predict():
 
             return jsonify({
 
-                "success": False,
+                "success":
+                    False,
 
                 "error":
                     "No audio file provided."
@@ -451,10 +530,11 @@ def predict():
 
             return jsonify({
 
-                "success": False,
+                "success":
+                    False,
 
                 "error":
-                    "No file selected."
+                    "No audio file selected."
 
             }), 400
 
@@ -480,7 +560,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # SAVE TEMPORARY FILE
+        # SAVE TEMPORARY AUDIO
         # ----------------------------------------------------
 
         with tempfile.NamedTemporaryFile(
@@ -507,12 +587,12 @@ def predict():
 
 
         print(
-            "Features extracted:"
+            "Features extracted."
         )
 
 
         # ----------------------------------------------------
-        # DATAFRAME
+        # CREATE DATAFRAME
         # ----------------------------------------------------
 
         data = pd.DataFrame(
@@ -572,17 +652,17 @@ def predict():
         )
 
 
-        # ----------------------------------------------------
-        # CLASS MAPPING
-        # ----------------------------------------------------
+        # ====================================================
+        # PROBABILITY MAPPING
+        # ====================================================
         #
-        # V2 test script:
+        # Your V2 test_model_v2.py uses:
         #
-        # probability[0] = REAL
-        # probability[1] = FAKE
+        # probabilities[0] = REAL
+        # probabilities[1] = FAKE
         #
-        # prediction 1 = FAKE
         # prediction 0 = REAL
+        # prediction 1 = FAKE
         #
 
         real_probability = float(
@@ -595,7 +675,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # MODEL PREDICTION
+        # RAW MODEL PREDICTION
         # ----------------------------------------------------
 
         model_prediction = (
@@ -605,11 +685,9 @@ def predict():
         )
 
 
-        # ----------------------------------------------------
+        # ====================================================
         # HACKATHON DECISION
-        # ----------------------------------------------------
-        #
-        # Your chosen rule:
+        # ====================================================
         #
         # AI >= 85% -> AI-GENERATED
         # AI < 85%  -> REAL
@@ -643,11 +721,11 @@ def predict():
             )
 
 
-        # ----------------------------------------------------
+        # ====================================================
         # DISPLAY CONFIDENCE
-        # ----------------------------------------------------
+        # ====================================================
         #
-        # The website uses the larger probability.
+        # Your website displays the larger probability.
         #
 
         confidence = max(
@@ -657,7 +735,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # CONVERT TO %
+        # CONVERT TO PERCENTAGE
         # ----------------------------------------------------
 
         real_percentage = round(
@@ -676,14 +754,12 @@ def predict():
         )
 
 
-        # ----------------------------------------------------
+        # ====================================================
         # PRINT RESULT
-        # ----------------------------------------------------
+        # ====================================================
 
         print()
-        print("--------------------------------")
-        print("RESULT")
-        print("--------------------------------")
+        print("----------------------------------------")
 
         print(
             "Model prediction:",
@@ -696,7 +772,7 @@ def predict():
         )
 
         print(
-            "Real probability:",
+            "REAL probability:",
             f"{real_percentage}%"
         )
 
@@ -710,12 +786,12 @@ def predict():
             f"{confidence_percentage}%"
         )
 
-        print("--------------------------------")
+        print("----------------------------------------")
 
 
-        # ----------------------------------------------------
-        # RETURN JSON
-        # ----------------------------------------------------
+        # ====================================================
+        # JSON RESPONSE
+        # ====================================================
 
         return jsonify({
 
@@ -749,9 +825,9 @@ def predict():
     except Exception as e:
 
         print()
-        print("================================")
+        print("========================================")
         print("PREDICTION ERROR")
-        print("================================")
+        print("========================================")
 
         print(
             type(e).__name__
@@ -761,7 +837,7 @@ def predict():
             str(e)
         )
 
-        print("================================")
+        print("========================================")
 
 
         return jsonify({
@@ -778,7 +854,7 @@ def predict():
     finally:
 
         # ----------------------------------------------------
-        # DELETE TEMP FILE
+        # DELETE TEMPORARY FILE
         # ----------------------------------------------------
 
         if (
@@ -815,20 +891,18 @@ if __name__ == "__main__":
 
 
     print()
-    print("================================")
-    print("Starting DeepVoice Guard")
-    print("================================")
+    print("========================================")
+    print("STARTING DEEPVOICE GUARD")
+    print("========================================")
 
     print(
-        f"Frontend: {FRONTEND_DIR}"
+        "Port:",
+        port
     )
 
     print(
-        f"Port: {port}"
-    )
-
-    print(
-        "Model: V2"
+        "Model:",
+        "V2"
     )
 
     print(
@@ -836,10 +910,20 @@ if __name__ == "__main__":
         len(FEATURES)
     )
 
+    print(
+        "Frontend:",
+        FRONTEND_DIR
+    )
+
+    print(
+        "index.html exists:",
+        os.path.isfile(INDEX_FILE)
+    )
+
     print()
-    print("================================")
+    print("========================================")
     print("DECISION RULE")
-    print("================================")
+    print("========================================")
 
     print(
         "AI probability >= 85% -> AI-GENERATED"
@@ -849,7 +933,7 @@ if __name__ == "__main__":
         "AI probability < 85%  -> REAL"
     )
 
-    print("================================")
+    print("========================================")
 
 
     app.run(
