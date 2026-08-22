@@ -104,7 +104,7 @@ audioFile.addEventListener(
 
 
 // ==========================================
-// Handle selected file
+// Handle file
 // ==========================================
 
 function handleFile(file) {
@@ -124,7 +124,7 @@ function handleFile(file) {
 
 
 // ==========================================
-// Drag and drop
+// Drag and Drop
 // ==========================================
 
 dropZone.addEventListener(
@@ -168,7 +168,9 @@ dropZone.addEventListener(
 
         if (files.length > 0) {
 
-            handleFile(files[0]);
+            handleFile(
+                files[0]
+            );
 
         }
 
@@ -309,7 +311,7 @@ async function analyzeVoice() {
 
 
 // ==========================================
-// Show result
+// SHOW RESULT
 // ==========================================
 
 function showResult(data) {
@@ -319,14 +321,10 @@ function showResult(data) {
 
 
     // ======================================
-    // Prediction
+    // KEEP BACKEND DECISION
     // ======================================
 
-    if (
-        data.prediction === "FAKE"
-    ) {
-
-        // AI-generated
+    if (data.prediction === "FAKE") {
 
         resultIcon.textContent =
             "⚠";
@@ -338,10 +336,7 @@ function showResult(data) {
         resultLabel.textContent =
             "AI-GENERATED VOICE";
 
-
     } else {
-
-        // REAL
 
         resultIcon.textContent =
             "✓";
@@ -352,63 +347,161 @@ function showResult(data) {
 
         resultLabel.textContent =
             "REAL VOICE";
+    }
+
+
+    // ======================================
+    // GET PROBABILITIES
+    // ======================================
+
+    const real =
+        Number(
+            data.real_probability
+        );
+
+    const fake =
+        Number(
+            data.fake_probability
+        );
+
+
+    // ======================================
+    // USE THE HIGHER VALUE FOR DISPLAY
+    // ======================================
+
+    const displayPercentage =
+        Math.max(
+            real,
+            fake
+        );
+
+
+    // ======================================
+    // TOP BIG PERCENTAGE
+    // ======================================
+
+    // IMPORTANT:
+    // index.html already contains the "%"
+    // after this span.
+    //
+    // Therefore DON'T add "%" here.
+
+    confidence.textContent =
+        displayPercentage.toFixed(2);
+
+
+    // ======================================
+    // GET COMPLETE BAR ROWS
+    // ======================================
+
+    const realRow =
+        realBar.closest(
+            ".probability-row"
+        );
+
+    const fakeRow =
+        fakeBar.closest(
+            ".probability-row"
+        );
+
+
+    // ======================================
+    // RESET BOTH ROWS
+    // ======================================
+
+    realRow.style.display =
+        "none";
+
+    fakeRow.style.display =
+        "none";
+
+
+    // Reset bars
+
+    realBar.style.width =
+        "0%";
+
+    fakeBar.style.width =
+        "0%";
+
+
+    // Reset percentage text
+
+    realProbability.textContent =
+        "";
+
+    fakeProbability.textContent =
+        "";
+
+
+    // ======================================
+    // REAL RESULT
+    // ======================================
+
+    if (
+        data.prediction === "REAL"
+    ) {
+
+        // Show ONLY real row
+
+        realRow.style.display =
+            "block";
+
+
+        // The meter percentage MUST
+        // match the big percentage.
+
+        realProbability.textContent =
+            displayPercentage.toFixed(2) +
+            "%";
+
+
+        // Animate real meter
+
+        setTimeout(() => {
+
+            realBar.style.width =
+                displayPercentage + "%";
+
+        }, 100);
 
     }
 
 
     // ======================================
-    // Confidence
+    // AI RESULT
     // ======================================
 
-    confidence.textContent =
-        data.confidence + "%";
+    else {
+
+        // Show ONLY AI row
+
+        fakeRow.style.display =
+            "block";
 
 
-    // ======================================
-    // Real probability
-    // ======================================
+        // The meter percentage MUST
+        // match the big percentage.
 
-    realProbability.textContent =
-        data.real_probability + "%";
-
-
-    // ======================================
-    // AI probability
-    // ======================================
-
-    fakeProbability.textContent =
-        data.fake_probability + "%";
+        fakeProbability.textContent =
+            displayPercentage.toFixed(2) +
+            "%";
 
 
-    // ======================================
-    // Reset bars before animation
-    // ======================================
+        // Animate AI meter
 
-    realBar.style.width = "0%";
-
-    fakeBar.style.width = "0%";
-
-
-    // ======================================
-    // Animate probability bars
-    // ======================================
-
-    setTimeout(
-        () => {
-
-            realBar.style.width =
-                data.real_probability + "%";
+        setTimeout(() => {
 
             fakeBar.style.width =
-                data.fake_probability + "%";
+                displayPercentage + "%";
 
-        },
-        100
-    );
+        }, 100);
+
+    }
 
 
     // ======================================
-    // Confidence level
+    // CONFIDENCE LEVEL
     // ======================================
 
     confidenceLevel.textContent =
@@ -416,22 +509,19 @@ function showResult(data) {
 
 
     // ======================================
-    // Scroll to result
+    // SCROLL TO RESULT
     // ======================================
 
     resultCard.scrollIntoView({
-
         behavior: "smooth",
-
         block: "center"
-
     });
 
 }
 
 
 // ==========================================
-// Show error
+// ERROR
 // ==========================================
 
 function showError(message) {
@@ -446,7 +536,7 @@ function showError(message) {
 
 
 // ==========================================
-// New analysis
+// NEW ANALYSIS
 // ==========================================
 
 newAnalysis.addEventListener(
@@ -457,7 +547,8 @@ newAnalysis.addEventListener(
 
         audioFile.value = "";
 
-        selectedFile.textContent = "";
+        selectedFile.textContent =
+            "";
 
         analyzeButton.disabled =
             true;
@@ -468,11 +559,58 @@ newAnalysis.addEventListener(
         errorBox.style.display =
             "none";
 
+
+        // Reset bars
+
         realBar.style.width =
             "0%";
 
         fakeBar.style.width =
             "0%";
+
+
+        // Reset rows
+
+        const realRow =
+            realBar.closest(
+                ".probability-row"
+            );
+
+        const fakeRow =
+            fakeBar.closest(
+                ".probability-row"
+            );
+
+
+        if (realRow) {
+
+            realRow.style.display =
+                "block";
+
+        }
+
+
+        if (fakeRow) {
+
+            fakeRow.style.display =
+                "block";
+
+        }
+
+
+        // Reset values
+
+        confidence.textContent =
+            "0";
+
+        realProbability.textContent =
+            "0%";
+
+        fakeProbability.textContent =
+            "0%";
+
+
+        // Scroll to top
 
         window.scrollTo({
 
