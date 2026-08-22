@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>DeepVoice Guard</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Background decoration -->
+    <div class="background-glow glow-1"></div>
+    <div class="background-glow glow-2"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+
+        <div class="logo">
+            <span class="logo-icon">◉</span>
+            DeepVoice<span>Guard</span>
+        </div>
+
+        <div class="nav-status">
+            <span class="status-dot"></span>
+            AI Detection System
+        </div>
+
+    </nav>
+
+
+    <!-- Main -->
+    <main class="container">
+
+        <!-- Hero -->
+        <section class="hero">
+
+            <div class="badge">
+                🎙️ AI VOICE FORENSICS
+            </div>
+
+            <h1>
+                Is this voice<br>
+                <span>real or AI?</span>
+            </h1>
+
+            <p>
+                Upload a voice recording and let our machine-learning
+                model analyze its acoustic characteristics.
+            </p>
+
+        </section>
+
+
+        <!-- Upload Card -->
+        <section class="upload-card">
+
+            <div
+                class="drop-zone"
+                id="dropZone"
+            >
+
+                <div class="mic-icon">
+                    🎤
+                </div>
+
+                <h2 id="uploadTitle">
+                    Upload a voice recording
+                </h2>
+
+                <p id="uploadText">
+                    Drag & drop your audio here or choose a file
+                </p>
+
+                <input
+                    type="file"
+                    id="audioFile"
+                    accept=".mp3,.wav,.mpeg,.m4a,.ogg"
+                    hidden
+                >
+
+                <button
+                    class="choose-button"
+                    id="chooseButton"
+                >
+                    Choose Audio
+                </button>
+
+                <div
+                    class="selected-file"
+                    id="selectedFile"
+                >
+                </div>
+
+            </div>
+
+
+            <!-- Analyze Button -->
+
+            <button
+                class="analyze-button"
+                id="analyzeButton"
+                disabled
+            >
+                <span>Analyze Voice</span>
+                <span class="arrow">→</span>
+            </button>
+
+
+            <!-- Loading -->
+
+            <div
+                class="loading"
+                id="loading"
+            >
+
+                <div class="loader"></div>
+
+                <p>Analyzing voice...</p>
+
+                <small>
+                    Extracting acoustic features
+                </small>
+
+            </div>
+
+
+            <!-- Error -->
+
+            <div
+                class="error"
+                id="error"
+            >
+            </div>
+
+        </section>
+
+
+        <!-- Result -->
+
+        <section
+            class="result-card"
+            id="resultCard"
+        >
+
+            <div class="result-header">
+                <span>ANALYSIS COMPLETE</span>
+            </div>
+
+
+            <div
+                class="result-icon"
+                id="resultIcon"
+            >
+                ✓
+            </div>
+
+
+            <div
+                class="result-label"
+                id="resultLabel"
+            >
+                REAL VOICE
+            </div>
+
+
+            <div class="confidence-container">
+
+                <div class="confidence-number">
+
+                    <span id="confidence">
+                        0
+                    </span>%
+
+                </div>
+
+                <div>
+                    Model confidence
+                </div>
+
+            </div>
+
+
+            <!-- Probability bars -->
+
+            <div class="probabilities">
+
+                <div class="probability-row">
+
+                    <div class="probability-info">
+                        <span>REAL VOICE</span>
+                        <strong id="realProbability">
+                            0%
+                        </strong>
+                    </div>
+
+                    <div class="progress">
+                        <div
+                            class="progress-real"
+                            id="realBar"
+                        ></div>
+                    </div>
+
+                </div>
+
+
+                <div class="probability-row">
+
+                    <div class="probability-info">
+                        <span>AI-GENERATED</span>
+                        <strong id="fakeProbability">
+                            0%
+                        </strong>
+                    </div>
+
+                    <div class="progress">
+                        <div
+                            class="progress-fake"
+                            id="fakeBar"
+                        ></div>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="confidence-badge">
+
+                Confidence:
+                <strong id="confidenceLevel">
+                    HIGH
+                </strong>
+
+            </div>
+
+
+            <button
+                class="new-analysis"
+                id="newAnalysis"
+            >
+                Analyze Another Voice
+            </button>
+
+        </section>
+
+
+        <!-- Model Information -->
+
+        <section class="model-section">
+
+            <h2>
+                Our Detection Model
+            </h2>
+
+            <p>
+                DeepVoice Guard analyzes acoustic features extracted
+                from speech and uses a Random Forest machine-learning
+                classifier to distinguish real and AI-generated voices.
+            </p>
+
+
+            <div class="metrics">
+
+                <div class="metric">
+
+                    <strong>
+                        98.56%
+                    </strong>
+
+                    <span>
+                        Accuracy
+                    </span>
+
+                </div>
+
+
+                <div class="metric">
+
+                    <strong>
+                        98.57%
+                    </strong>
+
+                    <span>
+                        F1 Score
+                    </span>
+
+                </div>
+
+
+                <div class="metric">
+
+                    <strong>
+                        99.24%
+                    </strong>
+
+                    <span>
+                        Recall
+                    </span>
+
+                </div>
+
+
+                <div class="metric">
+
+                    <strong>
+                        26
+                    </strong>
+
+                    <span>
+                        Audio Features
+                    </span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Disclaimer -->
+
+        <section class="disclaimer">
+
+            ⚠️
+            <span>
+                Results are AI-assisted predictions and may be affected
+                by recording quality, compression, background noise,
+                and voices outside the training data.
+            </span>
+
+        </section>
+
+    </main>
+
+
+    <footer>
+
+        DeepVoice Guard • Hackathon 2026
+
+    </footer>
+
+
+    <script src="script.js"></script>
+
+</body>
+</html>
