@@ -2,12 +2,11 @@
 // DeepVoice Guard Frontend
 // ==========================================
 
-// Flask backend endpoint
 const API_URL = "/predict";
 
 
 // ==========================================
-// Get HTML elements
+// HTML ELEMENTS
 // ==========================================
 
 const audioFile =
@@ -63,14 +62,14 @@ const newAnalysis =
 
 
 // ==========================================
-// Selected audio
+// SELECTED FILE
 // ==========================================
 
 let selectedAudio = null;
 
 
 // ==========================================
-// Choose Audio
+// CHOOSE BUTTON
 // ==========================================
 
 chooseButton.addEventListener(
@@ -84,7 +83,7 @@ chooseButton.addEventListener(
 
 
 // ==========================================
-// File selected
+// FILE SELECTED
 // ==========================================
 
 audioFile.addEventListener(
@@ -107,7 +106,7 @@ audioFile.addEventListener(
 
 
 // ==========================================
-// Handle file
+// HANDLE FILE
 // ==========================================
 
 function handleFile(file) {
@@ -117,17 +116,20 @@ function handleFile(file) {
     selectedFile.textContent =
         "Selected: " + file.name;
 
-    analyzeButton.disabled = false;
+    analyzeButton.disabled =
+        false;
 
-    errorBox.style.display = "none";
+    errorBox.style.display =
+        "none";
 
-    resultCard.style.display = "none";
+    resultCard.style.display =
+        "none";
 
 }
 
 
 // ==========================================
-// Drag over
+// DRAG OVER
 // ==========================================
 
 dropZone.addEventListener(
@@ -145,7 +147,7 @@ dropZone.addEventListener(
 
 
 // ==========================================
-// Drag leave
+// DRAG LEAVE
 // ==========================================
 
 dropZone.addEventListener(
@@ -161,7 +163,7 @@ dropZone.addEventListener(
 
 
 // ==========================================
-// Drop
+// DROP
 // ==========================================
 
 dropZone.addEventListener(
@@ -193,7 +195,7 @@ dropZone.addEventListener(
 
 
 // ==========================================
-// Analyze button
+// ANALYZE BUTTON
 // ==========================================
 
 analyzeButton.addEventListener(
@@ -203,7 +205,7 @@ analyzeButton.addEventListener(
 
 
 // ==========================================
-// Analyze Voice
+// ANALYZE VOICE
 // ==========================================
 
 async function analyzeVoice() {
@@ -219,9 +221,7 @@ async function analyzeVoice() {
     }
 
 
-    // --------------------------------------
-    // Reset previous result
-    // --------------------------------------
+    // Hide old result
 
     resultCard.style.display =
         "none";
@@ -230,9 +230,7 @@ async function analyzeVoice() {
         "none";
 
 
-    // --------------------------------------
-    // Loading
-    // --------------------------------------
+    // Show loading
 
     loading.style.display =
         "block";
@@ -244,7 +242,7 @@ async function analyzeVoice() {
     try {
 
         // ----------------------------------
-        // Form data
+        // FormData
         // ----------------------------------
 
         const formData =
@@ -263,7 +261,7 @@ async function analyzeVoice() {
 
 
         // ----------------------------------
-        // Send to Flask
+        // Send to backend
         // ----------------------------------
 
         const response =
@@ -283,21 +281,8 @@ async function analyzeVoice() {
 
 
         // ----------------------------------
-        // Read response as TEXT first
+        // Read response as text first
         // ----------------------------------
-        //
-        // IMPORTANT:
-        // Do NOT immediately call response.json().
-        //
-        // If Render returns an empty response,
-        // HTML error page, 502, 500, etc.,
-        // response.json() causes:
-        //
-        // "Unexpected end of JSON input"
-        //
-        // Reading text first lets us see
-        // what the server actually returned.
-        //
 
         const responseText =
             await response.text();
@@ -322,7 +307,7 @@ async function analyzeVoice() {
                 "The server returned an empty response " +
                 "(HTTP " +
                 response.status +
-                "). Check the Render logs."
+                ")."
             );
 
         }
@@ -352,12 +337,7 @@ async function analyzeVoice() {
                 "Server returned a non-JSON response " +
                 "(HTTP " +
                 response.status +
-                "). " +
-                "Response: " +
-                responseText.substring(
-                    0,
-                    300
-                )
+                ")."
             );
 
         }
@@ -381,14 +361,8 @@ async function analyzeVoice() {
 
 
         // ----------------------------------
-        // Successful result
+        // Show result
         // ----------------------------------
-
-        console.log(
-            "Prediction:",
-            data
-        );
-
 
         showResult(data);
 
@@ -396,10 +370,9 @@ async function analyzeVoice() {
     } catch (error) {
 
         console.error(
-            "Analysis error:",
+            "DeepVoice Guard error:",
             error
         );
-
 
         showError(
             "Could not analyze the audio. " +
@@ -421,7 +394,7 @@ async function analyzeVoice() {
 
 
 // ==========================================
-// Show Result
+// SHOW RESULT
 // ==========================================
 
 function showResult(data) {
@@ -431,7 +404,7 @@ function showResult(data) {
 
 
     // ======================================
-    // Determine result
+    // RESULT
     // ======================================
 
     const prediction =
@@ -441,7 +414,33 @@ function showResult(data) {
 
 
     // ======================================
-    // AI-GENERATED
+    // GET PROBABILITIES
+    // ======================================
+
+    const real =
+        Number(
+            data.real_probability
+        );
+
+    const fake =
+        Number(
+            data.fake_probability
+        );
+
+
+    // ======================================
+    // WINNING PERCENTAGE
+    // ======================================
+
+    const displayPercentage =
+        Math.max(
+            real,
+            fake
+        );
+
+
+    // ======================================
+    // RESULT ICON + LABEL
     // ======================================
 
     if (
@@ -458,14 +457,7 @@ function showResult(data) {
         resultLabel.textContent =
             "AI-GENERATED VOICE";
 
-    }
-
-
-    // ======================================
-    // REAL
-    // ======================================
-
-    else {
+    } else {
 
         resultIcon.textContent =
             "✓";
@@ -481,169 +473,125 @@ function showResult(data) {
 
 
     // ======================================
-    // Confidence
+    // BIG PERCENTAGE
+    // ======================================
+    //
+    // index.html already has the % sign.
+    //
+    // Therefore DON'T add % here.
+    //
+
+    confidence.textContent =
+        displayPercentage.toFixed(2);
+
+
+    // ======================================
+    // GET BAR ROWS
     // ======================================
 
-    const confidenceValue =
-        Number(
-            data.confidence
+    const realRow =
+        realBar.closest(
+            ".probability-row"
         );
 
+    const fakeRow =
+        fakeBar.closest(
+            ".probability-row"
+        );
+
+
+    // ======================================
+    // RESET
+    // ======================================
+
+    realRow.style.display =
+        "none";
+
+    fakeRow.style.display =
+        "none";
+
+    realBar.style.width =
+        "0%";
+
+    fakeBar.style.width =
+        "0%";
+
+    realProbability.textContent =
+        "";
+
+    fakeProbability.textContent =
+        "";
+
+
+    // ======================================
+    // REAL RESULT
+    // ======================================
 
     if (
-        Number.isFinite(
-            confidenceValue
-        )
+        prediction === "REAL"
     ) {
 
-        confidence.textContent =
-            confidenceValue.toFixed(2) + "%";
-
-    } else {
-
-        confidence.textContent =
-            "--";
-
-    }
-
-
-    // ======================================
-    // Probabilities
-    // ======================================
-
-    const realValue =
-        Number(
-            data.real_probability
-        );
-
-    const fakeValue =
-        Number(
-            data.fake_probability
-        );
-
-
-    // ======================================
-    // YOUR DISPLAY RULE
-    // ======================================
-    //
-    // You wanted the website to show only
-    // the winning result's percentage.
-    //
-    // Example:
-    //
-    // AI = 59%
-    // REAL = 41%
-    //
-    // Final result = REAL according to
-    // your 85% backend rule.
-    //
-    // The large confidence number should
-    // match the displayed result.
-    //
-    // The bars will also show only the
-    // selected result.
-    //
-    // ======================================
-
-
-    if (
-        prediction === "FAKE"
-    ) {
-
-        // AI result
-
-        fakeProbability.textContent =
-            fakeValue.toFixed(2) + "%";
-
-        realProbability.textContent =
-            "";
-
-        fakeBar.style.width =
-            fakeValue + "%";
-
-        realBar.style.width =
-            "0%";
-
-        fakeBar.style.display =
+        realRow.style.display =
             "block";
 
-        realBar.style.display =
-            "none";
+        realProbability.textContent =
+            displayPercentage.toFixed(2) +
+            "%";
+
+
+        setTimeout(
+            () => {
+
+                realBar.style.width =
+                    displayPercentage +
+                    "%";
+
+            },
+            100
+        );
 
     }
 
+
+    // ======================================
+    // AI RESULT
+    // ======================================
 
     else {
 
-        // REAL result
-
-        realProbability.textContent =
-            realValue.toFixed(2) + "%";
-
-        fakeProbability.textContent =
-            "";
-
-        realBar.style.width =
-            realValue + "%";
-
-        fakeBar.style.width =
-            "0%";
-
-        realBar.style.display =
+        fakeRow.style.display =
             "block";
 
-        fakeBar.style.display =
-            "none";
-
-    }
-
-
-    // ======================================
-    // Confidence level
-    // ======================================
-
-    if (
-        data.confidence_level
-    ) {
-
-        confidenceLevel.textContent =
-            data.confidence_level;
-
-    } else {
-
-        confidenceLevel.textContent =
-            "MEDIUM";
-
-    }
+        fakeProbability.textContent =
+            displayPercentage.toFixed(2) +
+            "%";
 
 
-    // ======================================
-    // Animate bar
-    // ======================================
-
-    requestAnimationFrame(
-        () => {
-
-            if (
-                prediction === "FAKE"
-            ) {
+        setTimeout(
+            () => {
 
                 fakeBar.style.width =
-                    fakeValue + "%";
+                    displayPercentage +
+                    "%";
 
-            } else {
+            },
+            100
+        );
 
-                realBar.style.width =
-                    realValue + "%";
-
-            }
-
-        }
-    );
+    }
 
 
     // ======================================
-    // Scroll to result
+    // CONFIDENCE LEVEL
+    // ======================================
+
+    confidenceLevel.textContent =
+        data.confidence_level ||
+        "MEDIUM";
+
+
+    // ======================================
+    // SCROLL
     // ======================================
 
     resultCard.scrollIntoView({
@@ -658,7 +606,7 @@ function showResult(data) {
 
 
 // ==========================================
-// Error
+// ERROR
 // ==========================================
 
 function showError(message) {
@@ -673,7 +621,7 @@ function showError(message) {
 
 
 // ==========================================
-// New Analysis
+// NEW ANALYSIS
 // ==========================================
 
 newAnalysis.addEventListener(
@@ -682,7 +630,8 @@ newAnalysis.addEventListener(
 
         selectedAudio = null;
 
-        audioFile.value = "";
+        audioFile.value =
+            "";
 
         selectedFile.textContent =
             "";
@@ -705,14 +654,40 @@ newAnalysis.addEventListener(
         fakeBar.style.width =
             "0%";
 
-        realBar.style.display =
-            "block";
 
-        fakeBar.style.display =
-            "block";
+        // Reset rows
+
+        const realRow =
+            realBar.closest(
+                ".probability-row"
+            );
+
+        const fakeRow =
+            fakeBar.closest(
+                ".probability-row"
+            );
 
 
-        // Reset percentages
+        if (realRow) {
+
+            realRow.style.display =
+                "block";
+
+        }
+
+
+        if (fakeRow) {
+
+            fakeRow.style.display =
+                "block";
+
+        }
+
+
+        // Reset values
+
+        confidence.textContent =
+            "0";
 
         realProbability.textContent =
             "0%";
@@ -720,18 +695,11 @@ newAnalysis.addEventListener(
         fakeProbability.textContent =
             "0%";
 
-
-        // Reset confidence
-
-        confidence.textContent =
-            "0%";
-
-
         confidenceLevel.textContent =
             "";
 
 
-        // Scroll top
+        // Scroll to top
 
         window.scrollTo({
 
