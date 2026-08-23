@@ -1,1001 +1,745 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
+// ==========================================
+// DeepVoice Guard Frontend
+// ==========================================
 
-import os
-import tempfile
+const API_URL = "/predict";
 
-import numpy as np
-import pandas as pd
-import librosa
-import joblib
 
+// ==========================================
+// HTML ELEMENTS
+// ==========================================
 
-# ============================================================
-# PATHS
-# ============================================================
+const audioFile =
+    document.getElementById("audioFile");
 
-BASE_DIR = os.path.dirname(
-    os.path.abspath(__file__)
-)
+const chooseButton =
+    document.getElementById("chooseButton");
 
-MODEL_PATH = os.path.join(
-    BASE_DIR,
-    "model",
-    "deepvoice_model_v2.pkl"
-)
+const dropZone =
+    document.getElementById("dropZone");
 
-# Repository structure:
-#
-# deepvoice/
-# ├── app.py
-# ├── requirements.txt
-# ├── model/
-# │   └── deepvoice_model_v2.pkl
-# └── frontend/
-#     ├── index.html
-#     ├── script.js
-#     └── style.css
+const analyzeButton =
+    document.getElementById("analyzeButton");
 
-FRONTEND_DIR = os.path.join(
-    BASE_DIR,
-    "frontend"
-)
+const selectedFile =
+    document.getElementById("selectedFile");
 
-INDEX_FILE = os.path.join(
-    FRONTEND_DIR,
-    "index.html"
-)
+const loading =
+    document.getElementById("loading");
 
+const errorBox =
+    document.getElementById("error");
 
-# ============================================================
-# FLASK
-# ============================================================
+const resultCard =
+    document.getElementById("resultCard");
 
-app = Flask(__name__)
+const resultIcon =
+    document.getElementById("resultIcon");
 
-CORS(app)
+const resultLabel =
+    document.getElementById("resultLabel");
 
-# Maximum upload size: 25 MB
-app.config["MAX_CONTENT_LENGTH"] = (
-    25 * 1024 * 1024
-)
+const confidence =
+    document.getElementById("confidence");
 
+const realProbability =
+    document.getElementById("realProbability");
 
-# ============================================================
-# DECISION SETTINGS
-# ============================================================
+const fakeProbability =
+    document.getElementById("fakeProbability");
 
-# FINAL HACKATHON RULE:
-#
-# AI probability >= 85% -> AI-GENERATED
-# AI probability < 85%  -> REAL
+const realBar =
+    document.getElementById("realBar");
 
-AI_THRESHOLD = 0.85
+const fakeBar =
+    document.getElementById("fakeBar");
 
-# Analyze only the first 30 seconds.
-# This helps prevent Render memory problems.
+const confidenceLevel =
+    document.getElementById("confidenceLevel");
 
-MAX_AUDIO_SECONDS = 30
+const newAnalysis =
+    document.getElementById("newAnalysis");
 
 
-# ============================================================
-# STARTUP INFORMATION
-# ============================================================
+// ==========================================
+// SELECTED AUDIO
+// ==========================================
 
-print("========================================")
-print("DeepVoice Guard Backend")
-print("========================================")
+let selectedAudio = null;
 
-print("BASE DIR:")
-print(BASE_DIR)
 
-print()
+// ==========================================
+// CHOOSE BUTTON
+// ==========================================
 
-print("MODEL PATH:")
-print(MODEL_PATH)
+chooseButton.addEventListener(
+    "click",
+    () => {
 
-print()
+        audioFile.click();
 
-print("FRONTEND PATH:")
-print(FRONTEND_DIR)
+    }
+);
 
-print()
 
-print("INDEX FILE:")
-print(INDEX_FILE)
+// ==========================================
+// FILE SELECTED
+// ==========================================
 
-print()
+audioFile.addEventListener(
+    "change",
+    () => {
 
-print(
-    "Model exists:",
-    os.path.isfile(MODEL_PATH)
-)
+        if (
+            audioFile.files &&
+            audioFile.files.length > 0
+        ) {
 
-print(
-    "Frontend exists:",
-    os.path.isdir(FRONTEND_DIR)
-)
+            handleFile(
+                audioFile.files[0]
+            );
 
-print(
-    "index.html exists:",
-    os.path.isfile(INDEX_FILE)
-)
+        }
 
-print("========================================")
+    }
+);
 
 
-# ============================================================
-# LOAD MODEL V2
-# ============================================================
+// ==========================================
+// HANDLE FILE
+// ==========================================
 
-model = None
-FEATURES = []
+function handleFile(file) {
 
+    selectedAudio = file;
 
-try:
+    selectedFile.textContent =
+        "Selected: " + file.name;
 
-    model_data = joblib.load(
-        MODEL_PATH
-    )
+    analyzeButton.disabled =
+        false;
 
-    model = model_data["model"]
+    errorBox.style.display =
+        "none";
 
-    FEATURES = model_data["features"]
+    resultCard.style.display =
+        "none";
 
-    print(
-        "Model V2 loaded successfully"
-    )
+}
 
-    print(
-        "Features:",
-        len(FEATURES)
-    )
 
-except Exception as e:
+// ==========================================
+// DRAG OVER
+// ==========================================
 
-    print("========================================")
-    print("MODEL LOAD ERROR")
-    print("========================================")
+dropZone.addEventListener(
+    "dragover",
+    (event) => {
 
-    print(
-        type(e).__name__
-    )
+        event.preventDefault();
 
-    print(
-        str(e)
-    )
+        dropZone.classList.add(
+            "dragover"
+        );
 
-    print("========================================")
+    }
+);
 
 
-# ============================================================
-# HOME PAGE
-# ============================================================
+// ==========================================
+// DRAG LEAVE
+// ==========================================
 
-@app.route(
-    "/",
-    methods=["GET"]
-)
-def home():
+dropZone.addEventListener(
+    "dragleave",
+    () => {
 
-    print("HOME REQUEST")
+        dropZone.classList.remove(
+            "dragover"
+        );
 
-    if not os.path.isfile(
-        INDEX_FILE
-    ):
+    }
+);
 
-        return jsonify({
 
-            "success": False,
+// ==========================================
+// DROP
+// ==========================================
 
-            "error":
-                "frontend/index.html not found",
+dropZone.addEventListener(
+    "drop",
+    (event) => {
 
-            "expected_path":
-                INDEX_FILE
+        event.preventDefault();
 
-        }), 500
+        dropZone.classList.remove(
+            "dragover"
+        );
 
-    return send_from_directory(
-        FRONTEND_DIR,
-        "index.html"
-    )
+        const files =
+            event.dataTransfer.files;
 
+        if (
+            files &&
+            files.length > 0
+        ) {
 
-# ============================================================
-# FRONTEND FILES
-# ============================================================
+            handleFile(
+                files[0]
+            );
 
-@app.route(
-    "/<path:filename>",
-    methods=["GET"]
-)
-def frontend_files(filename):
+        }
 
-    requested_file = os.path.join(
-        FRONTEND_DIR,
-        filename
-    )
+    }
+);
 
-    if os.path.isfile(
-        requested_file
-    ):
 
-        return send_from_directory(
-            FRONTEND_DIR,
-            filename
-        )
+// ==========================================
+// ANALYZE
+// ==========================================
 
-    return jsonify({
+analyzeButton.addEventListener(
+    "click",
+    analyzeVoice
+);
 
-        "success": False,
 
-        "error":
-            "Frontend file not found",
+// ==========================================
+// ANALYZE VOICE
+// ==========================================
 
-        "file":
-            filename
+async function analyzeVoice() {
 
-    }), 404
+    if (!selectedAudio) {
 
+        showError(
+            "Please select an audio file first."
+        );
 
-# ============================================================
-# HEALTH CHECK
-# ============================================================
-
-@app.route(
-    "/health",
-    methods=["GET"]
-)
-def health():
-
-    return jsonify({
-
-        "success":
-            True,
-
-        "status":
-            "online",
-
-        "service":
-            "DeepVoice Guard",
-
-        "model":
-            "V2",
-
-        "model_loaded":
-            model is not None,
-
-        "features":
-            len(FEATURES),
-
-        "model_exists":
-            os.path.isfile(
-                MODEL_PATH
-            ),
-
-        "frontend_exists":
-            os.path.isdir(
-                FRONTEND_DIR
-            ),
-
-        "index_exists":
-            os.path.isfile(
-                INDEX_FILE
-            ),
-
-        "threshold":
-            85,
-
-        "max_audio_seconds":
-            MAX_AUDIO_SECONDS
-
-    })
-
-
-# ============================================================
-# FEATURE EXTRACTION
-# ============================================================
-
-def extract_features(audio_path):
-
-    print(
-        "Loading first",
-        MAX_AUDIO_SECONDS,
-        "seconds..."
-    )
-
-    # IMPORTANT:
-    # sr=None is preserved because this matches
-    # your V2 training/testing preprocessing.
-
-    y, sr = librosa.load(
-
-        audio_path,
-
-        sr=None,
-
-        mono=True,
-
-        duration=MAX_AUDIO_SECONDS
-
-    )
-
-
-    if y is None or len(y) == 0:
-
-        raise ValueError(
-            "Audio file is empty or could not be decoded."
-        )
-
-
-    print(
-        "Sample rate:",
-        sr
-    )
-
-    print(
-        "Samples:",
-        len(y)
-    )
-
-    print(
-        "Analyzed duration:",
-        round(
-            len(y) / sr,
-            2
-        ),
-        "seconds"
-    )
-
-
-    # ========================================================
-    # CHROMA
-    # ========================================================
-
-    chroma = librosa.feature.chroma_stft(
-        y=y,
-        sr=sr
-    )
-
-
-    # ========================================================
-    # RMS
-    # ========================================================
-
-    rms = librosa.feature.rms(
-        y=y
-    )
-
-
-    # ========================================================
-    # SPECTRAL CENTROID
-    # ========================================================
-
-    spectral_centroid = (
-        librosa.feature.spectral_centroid(
-            y=y,
-            sr=sr
-        )
-    )
-
-
-    # ========================================================
-    # SPECTRAL BANDWIDTH
-    # ========================================================
-
-    spectral_bandwidth = (
-        librosa.feature.spectral_bandwidth(
-            y=y,
-            sr=sr
-        )
-    )
-
-
-    # ========================================================
-    # SPECTRAL ROLLOFF
-    # ========================================================
-
-    rolloff = (
-        librosa.feature.spectral_rolloff(
-            y=y,
-            sr=sr
-        )
-    )
-
-
-    # ========================================================
-    # ZERO CROSSING RATE
-    # ========================================================
-
-    zero_crossing_rate = (
-        librosa.feature.zero_crossing_rate(
-            y
-        )
-    )
-
-
-    # ========================================================
-    # MFCC
-    # ========================================================
-
-    mfcc = librosa.feature.mfcc(
-        y=y,
-        sr=sr,
-        n_mfcc=20
-    )
-
-
-    # ========================================================
-    # CREATE FEATURES
-    # ========================================================
-
-    features = {
-
-        "chroma_stft":
-            float(
-                np.mean(chroma)
-            ),
-
-        "rms":
-            float(
-                np.mean(rms)
-            ),
-
-        "spectral_centroid":
-            float(
-                np.mean(
-                    spectral_centroid
-                )
-            ),
-
-        "spectral_bandwidth":
-            float(
-                np.mean(
-                    spectral_bandwidth
-                )
-            ),
-
-        "rolloff":
-            float(
-                np.mean(
-                    rolloff
-                )
-            ),
-
-        "zero_crossing_rate":
-            float(
-                np.mean(
-                    zero_crossing_rate
-                )
-            )
+        return;
 
     }
 
 
-    # ========================================================
-    # MFCC 1-20
-    # ========================================================
+    // Hide previous result
 
-    for i in range(20):
+    resultCard.style.display =
+        "none";
 
-        features[
-            f"mfcc{i + 1}"
-        ] = float(
-            np.mean(
-                mfcc[i]
-            )
-        )
+    errorBox.style.display =
+        "none";
 
 
-    # Free memory
+    // Show loading
 
-    del y
-    del chroma
-    del rms
-    del spectral_centroid
-    del spectral_bandwidth
-    del rolloff
-    del zero_crossing_rate
-    del mfcc
+    loading.style.display =
+        "block";
 
+    analyzeButton.disabled =
+        true;
 
-    return features
 
+    try {
 
-# ============================================================
-# PREDICT
-# ============================================================
+        // ----------------------------------
+        // FormData
+        // ----------------------------------
 
-@app.route(
-    "/predict",
-    methods=["POST"]
-)
-def predict():
+        const formData =
+            new FormData();
 
-    audio_path = None
+        formData.append(
+            "audio",
+            selectedAudio
+        );
 
 
-    try:
+        console.log(
+            "Uploading:",
+            selectedAudio.name
+        );
 
-        print()
-        print("========================================")
-        print("NEW AUDIO REQUEST")
-        print("========================================")
 
+        // ----------------------------------
+        // Request
+        // ----------------------------------
 
-        # ----------------------------------------------------
-        # MODEL CHECK
-        # ----------------------------------------------------
+        const response =
+            await fetch(
+                API_URL,
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
 
-        if model is None:
 
-            return jsonify({
+        console.log(
+            "HTTP status:",
+            response.status
+        );
 
-                "success":
-                    False,
 
-                "error":
-                    "V2 model is not loaded."
+        // ----------------------------------
+        // Read response as text
+        // ----------------------------------
 
-            }), 500
+        const responseText =
+            await response.text();
 
 
-        # ----------------------------------------------------
-        # AUDIO CHECK
-        # ----------------------------------------------------
+        console.log(
+            "Server response:",
+            responseText
+        );
 
-        if "audio" not in request.files:
-
-            return jsonify({
-
-                "success":
-                    False,
-
-                "error":
-                    "No audio file provided."
-
-            }), 400
-
-
-        audio = request.files[
-            "audio"
-        ]
-
-
-        if not audio.filename:
-
-            return jsonify({
-
-                "success":
-                    False,
-
-                "error":
-                    "No audio file selected."
-
-            }), 400
-
-
-        print(
-            "File:",
-            audio.filename
-        )
-
-
-        # ----------------------------------------------------
-        # FILE EXTENSION
-        # ----------------------------------------------------
-
-        extension = os.path.splitext(
-            audio.filename
-        )[1].lower()
-
-
-        if not extension:
-
-            extension = ".wav"
-
-
-        # ----------------------------------------------------
-        # SAVE TEMPORARY FILE
-        # ----------------------------------------------------
-
-        with tempfile.NamedTemporaryFile(
-            delete=False,
-            suffix=extension
-        ) as temp:
-
-            audio_path = temp.name
-
-            audio.save(
-                audio_path
-            )
-
-
-        # ----------------------------------------------------
-        # FILE SIZE
-        # ----------------------------------------------------
-
-        file_size = os.path.getsize(
-            audio_path
-        )
-
-        print(
-            "File size:",
-            round(
-                file_size / 1024 / 1024,
-                2
-            ),
-            "MB"
-        )
-
-
-        # ----------------------------------------------------
-        # EXTRACT FEATURES
-        # ----------------------------------------------------
-
-        features = extract_features(
-            audio_path
-        )
-
-
-        print(
-            "Features extracted."
-        )
-
-
-        # ----------------------------------------------------
-        # DATAFRAME
-        # ----------------------------------------------------
-
-        data = pd.DataFrame(
-            [features]
-        )
-
-
-        # ----------------------------------------------------
-        # CHECK FEATURES
-        # ----------------------------------------------------
-
-        missing_features = [
-
-            feature
-
-            for feature in FEATURES
-
-            if feature
-            not in data.columns
-
-        ]
-
-
-        if missing_features:
-
-            raise ValueError(
-                "Missing model features: "
-                +
-                ", ".join(
-                    missing_features
-                )
-            )
-
-
-        # ----------------------------------------------------
-        # EXACT FEATURE ORDER
-        # ----------------------------------------------------
-
-        data = data[
-            FEATURES
-        ]
-
-
-        # ----------------------------------------------------
-        # MODEL PREDICTION
-        # ----------------------------------------------------
-
-        prediction_number = (
-            model.predict(data)[0]
-        )
-
-        probabilities = (
-            model.predict_proba(
-                data
-            )[0]
-        )
-
-
-        # ====================================================
-        # V2 PROBABILITY MAPPING
-        # ====================================================
-        #
-        # [0] = REAL
-        # [1] = FAKE
-        #
-
-        real_probability = float(
-            probabilities[0]
-        )
-
-        fake_probability = float(
-            probabilities[1]
-        )
-
-
-        # ----------------------------------------------------
-        # RAW MODEL PREDICTION
-        # ----------------------------------------------------
-
-        model_prediction = (
-
-            "FAKE"
-
-            if prediction_number == 1
-
-            else "REAL"
-
-        )
-
-
-        # ====================================================
-        # FINAL DECISION
-        # ====================================================
-        #
-        # AI >= 85% -> AI-GENERATED
-        # AI < 85%  -> REAL
-        #
 
         if (
-            fake_probability
-            >= AI_THRESHOLD
-        ):
+            !responseText ||
+            responseText.trim() === ""
+        ) {
 
-            prediction = "FAKE"
+            throw new Error(
+                "The server returned an empty response " +
+                "(HTTP " +
+                response.status +
+                ")."
+            );
 
-            display_label = (
-                "AI-GENERATED"
-            )
-
-        else:
-
-            prediction = "REAL"
-
-            display_label = (
-                "REAL"
-            )
+        }
 
 
-        # ----------------------------------------------------
-        # WINNING PROBABILITY
-        # ----------------------------------------------------
+        // ----------------------------------
+        // Parse JSON
+        // ----------------------------------
 
-        confidence = max(
-            real_probability,
-            fake_probability
-        )
+        let data;
 
+        try {
 
-        # ----------------------------------------------------
-        # PERCENTAGES
-        # ----------------------------------------------------
+            data =
+                JSON.parse(
+                    responseText
+                );
 
-        real_percentage = round(
-            real_probability * 100,
-            2
-        )
+        } catch (parseError) {
 
-        fake_percentage = round(
-            fake_probability * 100,
-            2
-        )
+            console.error(
+                "JSON parse error:",
+                parseError
+            );
 
-        confidence_percentage = round(
-            confidence * 100,
-            2
-        )
+            throw new Error(
+                "Server returned a non-JSON response " +
+                "(HTTP " +
+                response.status +
+                ")."
+            );
 
-
-        # ----------------------------------------------------
-        # CONFIDENCE LEVEL
-        # ----------------------------------------------------
-
-        if confidence_percentage >= 85:
-
-            confidence_level = "HIGH"
-
-        elif confidence_percentage >= 60:
-
-            confidence_level = "MEDIUM"
-
-        else:
-
-            confidence_level = "LOW"
+        }
 
 
-        # ----------------------------------------------------
-        # LOG RESULT
-        # ----------------------------------------------------
-
-        print()
-        print("----------------------------------------")
-
-        print(
-            "Model prediction:",
-            model_prediction
-        )
-
-        print(
-            "Final prediction:",
-            prediction
-        )
-
-        print(
-            "REAL:",
-            real_percentage,
-            "%"
-        )
-
-        print(
-            "AI:",
-            fake_percentage,
-            "%"
-        )
-
-        print(
-            "Confidence:",
-            confidence_percentage,
-            "%"
-        )
-
-        print(
-            "Threshold:",
-            "85%"
-        )
-
-        print("----------------------------------------")
-
-
-        # ----------------------------------------------------
-        # RESPONSE
-        # ----------------------------------------------------
-
-        return jsonify({
-
-            "success":
-                True,
-
-            "prediction":
-                prediction,
-
-            "display_label":
-                display_label,
-
-            "real_probability":
-                real_percentage,
-
-            "fake_probability":
-                fake_percentage,
-
-            "confidence":
-                confidence_percentage,
-
-            "confidence_level":
-                confidence_level,
-
-            "threshold":
-                85,
-
-            "analyzed_seconds":
-                MAX_AUDIO_SECONDS
-
-        })
-
-
-    except Exception as e:
-
-        print()
-        print("========================================")
-        print("PREDICTION ERROR")
-        print("========================================")
-
-        print(
-            type(e).__name__
-        )
-
-        print(
-            str(e)
-        )
-
-        print("========================================")
-
-
-        return jsonify({
-
-            "success":
-                False,
-
-            "error":
-                str(e)
-
-        }), 500
-
-
-    finally:
-
-        # ----------------------------------------------------
-        # DELETE TEMP FILE
-        # ----------------------------------------------------
+        // ----------------------------------
+        // Backend error
+        // ----------------------------------
 
         if (
-            audio_path
-            and
-            os.path.exists(
-                audio_path
-            )
-        ):
+            !response.ok ||
+            !data.success
+        ) {
 
-            try:
+            throw new Error(
+                data.error ||
+                "Prediction failed."
+            );
 
-                os.remove(
-                    audio_path
-                )
-
-            except Exception:
-
-                pass
+        }
 
 
-# ============================================================
-# START SERVER
-# ============================================================
+        // ----------------------------------
+        // Display result
+        // ----------------------------------
 
-if __name__ == "__main__":
-
-    port = int(
-        os.environ.get(
-            "PORT",
-            5000
-        )
-    )
+        showResult(data);
 
 
-    print()
-    print("========================================")
-    print("STARTING DEEPVOICE GUARD")
-    print("========================================")
+    } catch (error) {
 
-    print(
-        "Port:",
-        port
-    )
+        console.error(
+            "Analysis error:",
+            error
+        );
 
-    print(
-        "Model: V2"
-    )
-
-    print(
-        "Features:",
-        len(FEATURES)
-    )
-
-    print(
-        "Frontend:",
-        FRONTEND_DIR
-    )
-
-    print()
-    print("DECISION RULE")
-    print(
-        "AI probability >= 85% -> AI-GENERATED"
-    )
-    print(
-        "AI probability < 85%  -> REAL"
-    )
-
-    print("========================================")
+        showError(
+            "Could not analyze the audio. " +
+            error.message
+        );
 
 
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+    } finally {
+
+        loading.style.display =
+            "none";
+
+        analyzeButton.disabled =
+            false;
+
+    }
+
+}
+
+
+// ==========================================
+// SHOW RESULT
+// ==========================================
+
+function showResult(data) {
+
+    resultCard.style.display =
+        "block";
+
+
+    // ======================================
+    // FINAL PREDICTION
+    // ======================================
+
+    const prediction =
+        String(
+            data.prediction || ""
+        ).toUpperCase();
+
+
+    // ======================================
+    // PROBABILITIES
+    // ======================================
+
+    const real =
+        Number(
+            data.real_probability
+        );
+
+    const fake =
+        Number(
+            data.fake_probability
+        );
+
+
+    // ======================================
+    // DISPLAY PERCENTAGE
+    // ======================================
+    //
+    // IMPORTANT:
+    //
+    // This is the probability corresponding
+    // to the final displayed result.
+    //
+    // The backend decides:
+    //
+    // AI >= 85% -> AI
+    // AI < 85%  -> REAL
+    //
+    // ======================================
+
+    let displayPercentage;
+
+
+    if (
+        prediction === "FAKE"
+    ) {
+
+        displayPercentage =
+            fake;
+
+    } else {
+
+        displayPercentage =
+            fake < 85
+                ? fake
+                : real;
+
+    }
+
+
+    // ======================================
+    // RESULT ICON + LABEL
+    // ======================================
+
+    if (
+        prediction === "FAKE"
+    ) {
+
+        resultIcon.textContent =
+            "⚠";
+
+        resultIcon.classList.add(
+            "fake"
+        );
+
+        resultLabel.textContent =
+            "AI-GENERATED VOICE";
+
+    } else {
+
+        resultIcon.textContent =
+            "✓";
+
+        resultIcon.classList.remove(
+            "fake"
+        );
+
+        resultLabel.textContent =
+            "REAL VOICE";
+
+    }
+
+
+    // ======================================
+    // BIG PERCENTAGE
+    // ======================================
+    //
+    // index.html already contains %.
+    //
+    // Therefore only put the number here.
+    //
+
+    confidence.textContent =
+        displayPercentage.toFixed(2);
+
+
+    // ======================================
+    // BAR ROWS
+    // ======================================
+
+    const realRow =
+        realBar.closest(
+            ".probability-row"
+        );
+
+    const fakeRow =
+        fakeBar.closest(
+            ".probability-row"
+        );
+
+
+    // ======================================
+    // RESET BARS
+    // ======================================
+
+    realBar.style.width =
+        "0%";
+
+    fakeBar.style.width =
+        "0%";
+
+
+    realProbability.textContent =
+        "";
+
+    fakeProbability.textContent =
+        "";
+
+
+    // ======================================
+    // SHOW ONLY FINAL RESULT BAR
+    // ======================================
+
+    if (
+        prediction === "FAKE"
+    ) {
+
+        if (realRow) {
+
+            realRow.style.display =
+                "none";
+
+        }
+
+        if (fakeRow) {
+
+            fakeRow.style.display =
+                "block";
+
+        }
+
+
+        fakeProbability.textContent =
+            displayPercentage.toFixed(2) +
+            "%";
+
+
+        setTimeout(
+            () => {
+
+                fakeBar.style.width =
+                    displayPercentage +
+                    "%";
+
+            },
+            100
+        );
+
+    } else {
+
+        if (fakeRow) {
+
+            fakeRow.style.display =
+                "none";
+
+        }
+
+        if (realRow) {
+
+            realRow.style.display =
+                "block";
+
+        }
+
+
+        realProbability.textContent =
+            displayPercentage.toFixed(2) +
+            "%";
+
+
+        setTimeout(
+            () => {
+
+                realBar.style.width =
+                    displayPercentage +
+                    "%";
+
+            },
+            100
+        );
+
+    }
+
+
+    // ======================================
+    // CONFIDENCE LEVEL
+    // ======================================
+
+    confidenceLevel.textContent =
+        data.confidence_level ||
+        "MEDIUM";
+
+
+    // ======================================
+    // SCROLL
+    // ======================================
+
+    resultCard.scrollIntoView({
+
+        behavior: "smooth",
+
+        block: "center"
+
+    });
+
+}
+
+
+// ==========================================
+// ERROR
+// ==========================================
+
+function showError(message) {
+
+    errorBox.textContent =
+        message;
+
+    errorBox.style.display =
+        "block";
+
+}
+
+
+// ==========================================
+// NEW ANALYSIS
+// ==========================================
+
+newAnalysis.addEventListener(
+    "click",
+    () => {
+
+        selectedAudio = null;
+
+        audioFile.value =
+            "";
+
+        selectedFile.textContent =
+            "";
+
+        analyzeButton.disabled =
+            true;
+
+        resultCard.style.display =
+            "none";
+
+        errorBox.style.display =
+            "none";
+
+
+        // Reset bars
+
+        realBar.style.width =
+            "0%";
+
+        fakeBar.style.width =
+            "0%";
+
+
+        // Restore both rows for next analysis
+
+        const realRow =
+            realBar.closest(
+                ".probability-row"
+            );
+
+        const fakeRow =
+            fakeBar.closest(
+                ".probability-row"
+            );
+
+
+        if (realRow) {
+
+            realRow.style.display =
+                "block";
+
+        }
+
+        if (fakeRow) {
+
+            fakeRow.style.display =
+                "block";
+
+        }
+
+
+        // Reset values
+
+        confidence.textContent =
+            "0";
+
+        realProbability.textContent =
+            "0%";
+
+        fakeProbability.textContent =
+            "0%";
+
+        confidenceLevel.textContent =
+            "";
+
+
+        // Scroll top
+
+        window.scrollTo({
+
+            top: 0,
+
+            behavior: "smooth"
+
+        });
+
+    }
+);
