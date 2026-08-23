@@ -55,30 +55,31 @@ app = Flask(__name__)
 
 CORS(app)
 
-
-# Maximum upload size
-app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+# Maximum upload size: 25 MB
+app.config["MAX_CONTENT_LENGTH"] = (
+    25 * 1024 * 1024
+)
 
 
 # ============================================================
-# SETTINGS
+# DECISION SETTINGS
 # ============================================================
 
-# FINAL DECISION:
+# FINAL HACKATHON RULE:
 #
-# AI > 50%  -> AI-GENERATED
-# AI <= 50% -> REAL
+# AI probability >= 85% -> AI-GENERATED
+# AI probability < 85%  -> REAL
 
-AI_THRESHOLD = 0.50
+AI_THRESHOLD = 0.85
 
-# Render free instance has limited RAM.
 # Analyze only the first 30 seconds.
+# This helps prevent Render memory problems.
 
 MAX_AUDIO_SECONDS = 30
 
 
 # ============================================================
-# STARTUP
+# STARTUP INFORMATION
 # ============================================================
 
 print("========================================")
@@ -105,20 +106,26 @@ print(INDEX_FILE)
 
 print()
 
-print("Model exists:")
-print(os.path.isfile(MODEL_PATH))
+print(
+    "Model exists:",
+    os.path.isfile(MODEL_PATH)
+)
 
-print("Frontend exists:")
-print(os.path.isdir(FRONTEND_DIR))
+print(
+    "Frontend exists:",
+    os.path.isdir(FRONTEND_DIR)
+)
 
-print("index.html exists:")
-print(os.path.isfile(INDEX_FILE))
+print(
+    "index.html exists:",
+    os.path.isfile(INDEX_FILE)
+)
 
 print("========================================")
 
 
 # ============================================================
-# LOAD V2 MODEL
+# LOAD MODEL V2
 # ============================================================
 
 model = None
@@ -135,7 +142,9 @@ try:
 
     FEATURES = model_data["features"]
 
-    print("Model V2 loaded successfully")
+    print(
+        "Model V2 loaded successfully"
+    )
 
     print(
         "Features:",
@@ -160,15 +169,20 @@ except Exception as e:
 
 
 # ============================================================
-# HOME
+# HOME PAGE
 # ============================================================
 
-@app.route("/", methods=["GET"])
+@app.route(
+    "/",
+    methods=["GET"]
+)
 def home():
 
     print("HOME REQUEST")
 
-    if not os.path.isfile(INDEX_FILE):
+    if not os.path.isfile(
+        INDEX_FILE
+    ):
 
         return jsonify({
 
@@ -203,7 +217,9 @@ def frontend_files(filename):
         filename
     )
 
-    if os.path.isfile(requested_file):
+    if os.path.isfile(
+        requested_file
+    ):
 
         return send_from_directory(
             FRONTEND_DIR,
@@ -224,7 +240,7 @@ def frontend_files(filename):
 
 
 # ============================================================
-# HEALTH
+# HEALTH CHECK
 # ============================================================
 
 @app.route(
@@ -269,7 +285,7 @@ def health():
             ),
 
         "threshold":
-            50,
+            85,
 
         "max_audio_seconds":
             MAX_AUDIO_SECONDS
@@ -290,8 +306,8 @@ def extract_features(audio_path):
     )
 
     # IMPORTANT:
-    # Keep sr=None because this matches
-    # the V2 model preprocessing.
+    # sr=None is preserved because this matches
+    # your V2 training/testing preprocessing.
 
     y, sr = librosa.load(
 
@@ -509,7 +525,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # MODEL
+        # MODEL CHECK
         # ----------------------------------------------------
 
         if model is None:
@@ -526,7 +542,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # AUDIO
+        # AUDIO CHECK
         # ----------------------------------------------------
 
         if "audio" not in request.files:
@@ -567,7 +583,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # EXTENSION
+        # FILE EXTENSION
         # ----------------------------------------------------
 
         extension = os.path.splitext(
@@ -581,7 +597,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # TEMPORARY FILE
+        # SAVE TEMPORARY FILE
         # ----------------------------------------------------
 
         with tempfile.NamedTemporaryFile(
@@ -674,13 +690,12 @@ def predict():
 
 
         # ----------------------------------------------------
-        # MODEL
+        # MODEL PREDICTION
         # ----------------------------------------------------
 
         prediction_number = (
             model.predict(data)[0]
         )
-
 
         probabilities = (
             model.predict_proba(
@@ -690,14 +705,11 @@ def predict():
 
 
         # ====================================================
-        # V2 CLASS MAPPING
+        # V2 PROBABILITY MAPPING
         # ====================================================
         #
-        # probabilities[0] = REAL
-        # probabilities[1] = FAKE
-        #
-        # prediction 0 = REAL
-        # prediction 1 = FAKE
+        # [0] = REAL
+        # [1] = FAKE
         #
 
         real_probability = float(
@@ -725,16 +737,16 @@ def predict():
 
 
         # ====================================================
-        # FINAL HACKATHON DECISION
+        # FINAL DECISION
         # ====================================================
         #
-        # AI > 50%  -> AI-GENERATED
-        # AI <= 50% -> REAL
+        # AI >= 85% -> AI-GENERATED
+        # AI < 85%  -> REAL
         #
 
         if (
             fake_probability
-            > AI_THRESHOLD
+            >= AI_THRESHOLD
         ):
 
             prediction = "FAKE"
@@ -753,7 +765,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # DISPLAY CONFIDENCE
+        # WINNING PROBABILITY
         # ----------------------------------------------------
 
         confidence = max(
@@ -761,6 +773,10 @@ def predict():
             fake_probability
         )
 
+
+        # ----------------------------------------------------
+        # PERCENTAGES
+        # ----------------------------------------------------
 
         real_percentage = round(
             real_probability * 100,
@@ -796,7 +812,7 @@ def predict():
 
 
         # ----------------------------------------------------
-        # LOG
+        # LOG RESULT
         # ----------------------------------------------------
 
         print()
@@ -825,9 +841,14 @@ def predict():
         )
 
         print(
-            "Displayed confidence:",
+            "Confidence:",
             confidence_percentage,
             "%"
+        )
+
+        print(
+            "Threshold:",
+            "85%"
         )
 
         print("----------------------------------------")
@@ -861,7 +882,7 @@ def predict():
                 confidence_level,
 
             "threshold":
-                50,
+                85,
 
             "analyzed_seconds":
                 MAX_AUDIO_SECONDS
@@ -939,7 +960,7 @@ if __name__ == "__main__":
 
     print()
     print("========================================")
-    print("Starting DeepVoice Guard")
+    print("STARTING DEEPVOICE GUARD")
     print("========================================")
 
     print(
@@ -961,12 +982,13 @@ if __name__ == "__main__":
         FRONTEND_DIR
     )
 
+    print()
+    print("DECISION RULE")
     print(
-        "AI > 50% -> AI-GENERATED"
+        "AI probability >= 85% -> AI-GENERATED"
     )
-
     print(
-        "AI <= 50% -> REAL"
+        "AI probability < 85%  -> REAL"
     )
 
     print("========================================")
